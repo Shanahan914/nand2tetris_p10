@@ -1,4 +1,5 @@
 from tokenizer import JackTokenizer
+from compilation_engine import CompilationEngine
 import sys
 import os
 
@@ -61,12 +62,41 @@ for file in jack_files:
     split_name = os.path.basename(file)
     name_without_extension = os.path.splitext(split_name)[0]
 
-    # set file name in codewriter
-    
+   # create name for out file
+    out_file = name_without_extension + ".xml"
+
+    # initialize a compilation engine
+    compilation_engine = CompilationEngine(tokenizer, out_file )
+
 
     # loop through each line in the current file
     while tokenizer.has_more_tokens():
+        # TODO move this out of the loop as comp engine will always advance to the next token 
         tokenizer.advance()
-        print(tokenizer.token_type())
+        token_type = tokenizer.token_type()
+
+        # keyword call
+        if token_type == 'KEYWORD':
+            current_token = tokenizer.keyword()
+            if current_token == 'WHILE':
+                compilation_engine.compile_while()
+
+        # symbol call
+        if token_type == 'SYMBOL':
+            current_token = tokenizer.symbol()
+
+         # symbol call
+        if token_type == 'IDENTIFIER':
+            current_token = tokenizer.identifier()
+        
+        # int_val
+        if token_type == 'INT_CONST':
+            current_token = tokenizer.int_val()
+        
+        # otherwise, must be identifer
+        if token_type == 'STRING_CONST':
+            current_token = tokenizer.string_val()
+        
+        print(token_type, ' : ',current_token)
 
 print('finished')

@@ -20,7 +20,6 @@ class JackTokenizer:
         self.is_string_val = False
         self.quote_type = None
         self.is_more_tokens = True
-        self.symbol_to_return = False
         self.current_char_global = None
 
         try:
@@ -47,16 +46,12 @@ class JackTokenizer:
         '''
         token = self._create_token()
         if token is not None:
-            print('current token 1', self.current_token)
-            # print(len(self.current_token))
             return
         self._get_next_line()
         token = self._create_token()
         if token is not None:
-            print('current token 2 ', self.current_token)
-            # print(len(self.current_token))
             return
-        #TODO need to reset instances vars back to orginal
+
 
     def _get_next_line(self):
         '''
@@ -85,14 +80,22 @@ class JackTokenizer:
             except StopIteration:
                 # Handle EOF
                 self.is_more_tokens = False
+                self.current_token = ''
                 return None
     
     def _create_token(self):
         '''
             private method to create a valid token
         '''
+        # empty string for token
         token_append = ''
+
+        # 
         while True:
+                # this func relies on a space to indicate end of a token. 
+                # We therefore need to account for new tokens where a space is not needed. 
+                # This always invovles symbols. Therefore, if we find a symbol we return the current token_append (if current_token > 0)
+                # We then set current_char_global to the symbol and return in the next call to this func.
                 if self.current_char_global:
                      self.current_token  = self.current_char_global
                      self.current_char_global = None
@@ -125,7 +128,6 @@ class JackTokenizer:
                     if len(token_append)>0:
                         self.current_token = token_append
                         self.current_char_global = current_char
-
                         return self.current_token
                     else: 
                         self.current_token = current_char
@@ -133,6 +135,7 @@ class JackTokenizer:
                 
                 # a space always indicates the end of a token
                 if current_char == ' ':
+                    self.current_char_global = None
                     if len(token_append) > 1:
                         self.current_token = token_append
                         return self.current_token
@@ -144,33 +147,9 @@ class JackTokenizer:
                 
 
 
-    def _call_lexical_element(self, token_type):
-        # string val call
-        if token_type == 'STRING_VAL':
-            self.string_val(self.current_token)
-        
-        # keyword call
-        if token_type == 'KEYWORD':
-             self.keyword(self.current_token)
-
-        # symbol call
-        if token_type == 'SYMBOL':
-            self.symbol(self.current_token)
-
-         # symbol call
-        if token_type == 'IDENTIFIER':
-            self.identifier(self.current_token)
-        
-        # int_val
-        if token_type == 'INT_CONST':
-            self.int_val(self.current_token)
-        
-        # otherwise, must be identifer
-        if token_type == 'STRING_CONST':
-            self.identifier(self.current_token)
-
-
     def token_type(self):
+        if len(self.current_token) == 0:
+            return
         '''
             determines the type of the current token. 
             Returns string constant from following: 
@@ -191,9 +170,11 @@ class JackTokenizer:
         
         # int_val
       
-            
-        if self.current_token[0].isdigit():
-                return 'INT_VAL'
+        try:  
+            if self.current_token[0].isdigit():
+                    return 'INT_CONST'
+        except:
+            return 'IDENTIFIER'
             
         
         return 'IDENTIFIER'
@@ -208,31 +189,34 @@ class JackTokenizer:
             FIELD, LET, DO, IF, ELSE, WHILE, RETURN,
             TRUE, FALSE, NULL, THIS
         '''
-        pass
+        
+        return self.current_token.upper()
 
     def symbol(self):
         '''
             determines the char in the symbol and 
             returns a char 
         '''
-        pass
+        return self.current_token
 
     def identifier(self):
         '''
             determines the identifer and 
             returns a string
         '''
+        return self.current_token
 
     def int_val(self):
         '''
             determines the integer value of the current token and
             returns an int
         '''
-        pass
+
+        return self.current_token
 
     def string_val(self):
         '''
             determines the string value of the current token and
             returns a str
         '''
-        pass
+        return self.current_token
