@@ -190,7 +190,7 @@ class JackTokenizer:
             TRUE, FALSE, NULL, THIS
         '''
         
-        return self.current_token.upper()
+        return self.current_token
 
     def symbol(self):
         '''

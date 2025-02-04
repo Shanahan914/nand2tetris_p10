@@ -68,18 +68,31 @@ for file in jack_files:
     # initialize a compilation engine
     compilation_engine = CompilationEngine(tokenizer, out_file )
 
-
+    tokenizer.advance()
     # loop through each line in the current file
     while tokenizer.has_more_tokens():
-        # TODO move this out of the loop as comp engine will always advance to the next token 
-        tokenizer.advance()
         token_type = tokenizer.token_type()
 
         # keyword call
         if token_type == 'KEYWORD':
             current_token = tokenizer.keyword()
-            if current_token == 'WHILE':
+            print(current_token)
+            if current_token == 'while':
                 compilation_engine.compile_while()
+            elif current_token == 'do':
+                compilation_engine.compile_do()
+            elif current_token == 'let':
+                compilation_engine.compile_let()
+            elif current_token == 'return':
+                compilation_engine.compile_return()
+            elif current_token == 'class':
+                compilation_engine.compile_class()
+            elif current_token in ('method', 'function', 'constructor'):
+                compilation_engine.compile_subroutine()
+            elif current_token in ('static', 'field'):
+                compilation_engine.compile_subroutine()
+            elif current_token in ('static', 'field'):
+                compilation_engine.compile_subroutine()
 
         # symbol call
         if token_type == 'SYMBOL':
@@ -97,6 +110,5 @@ for file in jack_files:
         if token_type == 'STRING_CONST':
             current_token = tokenizer.string_val()
         
-        print(token_type, ' : ',current_token)
 
 print('finished')
