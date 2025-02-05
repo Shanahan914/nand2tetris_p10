@@ -76,7 +76,6 @@ for file in jack_files:
         # keyword call
         if token_type == 'KEYWORD':
             current_token = tokenizer.keyword()
-            print(current_token)
             if current_token == 'while':
                 compilation_engine.compile_while()
             elif current_token == 'do':

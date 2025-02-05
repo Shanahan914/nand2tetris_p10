@@ -122,10 +122,10 @@ class CompilationEngine:
 
         # rule - must be subroutineBody
         self.tokenizer.advance()
-        print('before body', self.tokenizer.keyword())
         self._compile_subroutine_body()
 
         # close tag
+        self.indent_level -= 1
         self._write_tag('/subroutineDec')
 
         return
@@ -159,6 +159,9 @@ class CompilationEngine:
         # opening tag
         self._write_tag('parameterList')
 
+        # change indent
+        self.indent_level += 1
+
         # write parameters
         ## TODO - suspect this is wrong, we need to look for , not type
         while self._check_is_type():
@@ -173,8 +176,6 @@ class CompilationEngine:
 
         # close
         self._write_tag(f'/parameterList')
-
-        print(self.tokenizer.symbol())
 
         return
 
@@ -216,8 +217,7 @@ class CompilationEngine:
     def compile_statements(self):
         # opening tag
         self._write_tag('Statements')
-
-        print(self.tokenizer.keyword())
+        self.indent_level += 1
 
         # rule - must be if, let, while, do or return
         while self.tokenizer.token_type() == 'KEYWORD' and self.tokenizer.keyword() in ('if', 'let', 'while', 'do', 'return'):
@@ -236,7 +236,7 @@ class CompilationEngine:
 
         return
 
-# TODO - we don't call subroutine - we need to add it as identifier and then the parameter list
+
     def compile_do(self):
         # opening tag
         self._write_tag('doStatement')
@@ -246,8 +246,15 @@ class CompilationEngine:
             self._write_tag('keyword', 'do')
 
         # call subroutine
-        self.tokenizer.advance()
-        self.compile_subroutine()
+        if self._advance_and_check_type_only('IDENTIFIER'):
+            identifier = self.tokenizer.identifier()
+            self.tokenizer.advance()
+            current_symbol = self.tokenizer.symbol()
+            if current_symbol in ('(', '.'):
+                self._subroutine_call(current_symbol, identifier)
+        
+        if self._only_check('SYMBOL', ';'):
+            self._write_tag('symbol', ';')
 
         # close tag
         self._close_tag('/doStatement')
@@ -277,7 +284,7 @@ class CompilationEngine:
             self.compile_expression()
 
             # rule - must be ']'
-            if self._advance_and_check('SYMBOL', '['):
+            if self._only_check('SYMBOL', ']'):
                 self._write_tag('symbol', ']')
             
             # we need to advance to mirror case where 'check for expression' is false
@@ -296,7 +303,7 @@ class CompilationEngine:
         self.compile_expression()
 
         # rule - must be ';'
-        if self._advance_and_check('SYMBOL', ';'):
+        if self._only_check('SYMBOL', ';'):
             self._write_tag('symbol', ';')
 
         # close
@@ -321,7 +328,7 @@ class CompilationEngine:
         self.compile_expression()
 
         # rule - must be ')'
-        if self._advance_and_check('SYMBOL', ')'):
+        if self._only_check('SYMBOL', ')'):
             self._write_tag('symbol', ')')
 
         # rule - must be '{'
@@ -333,7 +340,7 @@ class CompilationEngine:
         self.compile_statements()
 
         # rule - must be '}'
-        if self._advance_and_check('SYMBOL', '}'):
+        if self._only_check('SYMBOL', '}'):
             self._write_tag('symbol', '}')
 
         # close
@@ -353,7 +360,7 @@ class CompilationEngine:
         # check for expression
         if not self._advance_and_check_for_option('SYMBOL', ';'):
             self.compile_expression()
-            if not self._advance_and_check('SYMBOL', ';'):
+            if not self._only_check('SYMBOL', ';'):
                 raise Exception("Expected to see ';'")
         
         self._write_tag('symbol', ';')
@@ -383,7 +390,7 @@ class CompilationEngine:
         self.compile_expression()
 
         # rule - must be ')'
-        if self._advance_and_check('SYMBOL', ')'):
+        if self._only_check('SYMBOL', ')'):
             self._write_tag('symbol', ')')
 
         # rule - must be '{'
@@ -395,7 +402,7 @@ class CompilationEngine:
         self.compile_statements()
 
         # rule - must be '}'
-        if self._advance_and_check('SYMBOL', '}'):
+        if self._only_check('SYMBOL', '}'):
             self._write_tag('symbol', '}')
 
 
@@ -428,12 +435,35 @@ class CompilationEngine:
 
     
     def compile_expression(self):
-        pass 
+
+        # opening statement tag
+        self._write_tag('expression')
+        self.indent_level += 1
+
+
+        if self.tokenizer.symbol() == ')':
+            return
+        # rule - call term
+        self.compile_term()
+
+        # optional - is it an op?
+        while self.tokenizer.symbol() in ('+', '-', '*', '/', '&', '|', '<', '>', '='):
+            self._write_tag('symbol', self.tokenizer.symbol())
+            self.tokenizer.advance()
+            self.compile_term()
+
+        
+        
+        self.indent_level -= 1
+        self._write_tag('/expression')
+
+
 
     def compile_term(self):
 
         # open
         self._write_tag('term')
+        self.indent_level +=1
 
         # determine type
         type_term  = self._type_term()
@@ -461,7 +491,7 @@ class CompilationEngine:
             # this means its either varName[expression] or subroutine
             identifier_token = self.tokenizer.identifier() # holding here so we have option of calling _compile_subroutine 
             self.tokenizer.advance()
-            if self.tokenizer.token_type == 'SYMBOL':
+            if self.tokenizer.token_type() == 'SYMBOL':
                 current_symbol = self.tokenizer.symbol() # to avoid two calls
                 # rule - varName [expression]
                 if current_symbol == '[':
@@ -473,51 +503,60 @@ class CompilationEngine:
                     # rule - must be ]
                     if self._only_check('SYMBOL', ']'):
                         self._write_tag('symbol', ']')
-                # rule - subroutineCall
-                # subrule - optional grammar = subroutineName '(' expressionList ')' 
-                elif current_symbol == '(':
-                    self._write_tag('identifier', identifier_token)
-                    self._write_tag('symbol', '(')
-                    # rule - must be an expression
-                    self.tokenizer.advance()
-                    self.compile_expression()
-                    # rule - must be )
-                    if self._only_check('SYMBOL', ')'):
-                        self._write_tag('symbol', ')')
-                # subrule - optional grammar =  (className | varName) '.' subroutineName '(' expressionList ')'
-                elif current_symbol == '.':
-                    self._write_tag('identifier', identifier_token)
-                    self._write_tag('symbol', '.')
-                    # rule - must be an identifier
-                    if self._advance_and_check_type_only('identifier'):
-                        self._write_tag('identifier', self.tokenizer.identifier())
-                        self._write_tag('symbol', '(')
-                        # rule - must be an expression
                         self.tokenizer.advance()
-                        self.compile_expression
-                        # rule - must be )
-                        if self._only_check('SYMBOL', ')'):
-                            self._write_tag('symbol', ')')
+                # rule - subroutineCall
+                elif current_symbol in ('(', '.'):
+                    self._subroutine_call(current_symbol, identifier_token)
+                    # rule - must be ')'
+                    
+                
+                # otherwise, it's varName only
+                else:
+                    self._write_tag('identifier', identifier_token)
+                    self.indent_level -= 1
+                    self._write_tag('/term')
+                    return
+
             # otherwise, it's varName only
             else:
                 self._write_tag('identifier', identifier_token)
-            
-            # decrement indent
-            self.indent_level -= 1
 
-            # close
+            self.indent_level -= 1
             self._write_tag('/term')
 
             return
         
          # close tag
         self._close_tag('/term')
-
         return 
 
 
     def compile_expression_list(self):
-        pass
+        # open
+        self._write_tag('expressionList')
+        self.indent_level +=1
+
+        # check for no expressions
+        if not self.tokenizer.symbol() == ')':
+           
+
+            # rule - call expression
+            self.compile_expression()
+
+            # check for other expressions
+            while self.tokenizer.symbol() == ',':
+                self.tokenizer.advance()
+                self.compile_expression()
+
+                
+        
+
+        # close
+        self.indent_level -=1
+        self._write_tag('/expressionList')
+        
+
+        return
 
 
 
@@ -536,6 +575,7 @@ class CompilationEngine:
     def _first_token_tag(self, keyword, content):
         # indent
         self.indent_level += 1
+  
 
         # get token type    
         token_type = self.tokenizer.token_type()
@@ -559,7 +599,7 @@ class CompilationEngine:
         # get token type    
         token_type = self.tokenizer.token_type()
 
-        print(token_type)
+
 
         # get current token
         if keyword in self.keyword_to_func:
@@ -669,7 +709,8 @@ class CompilationEngine:
             if symbol in ('-', '~'):
                 return 'unaryOp'
         else:
-            raise Exception(f'Expected a term but first token did not indicate not allow parsing')
+        
+            raise Exception(f'Expected a term but first token was {token_type} and {self.tokenizer.symbol()}')
         
     
     def _subroutine_call(self, current_symbol, identifier_token):
@@ -679,24 +720,25 @@ class CompilationEngine:
             self._write_tag('symbol', '(')
             # rule - must be an expression
             self.tokenizer.advance()
-            self.compile_expression()
-            # rule - must be )
-            if self._only_check('SYMBOL', ')'):
-                self._write_tag('symbol', ')')
+            self.compile_expression_list()
+
         # subrule - optional grammar =  (className | varName) '.' subroutineName '(' expressionList ')'
         elif current_symbol == '.':
             self._write_tag('identifier', identifier_token)
             self._write_tag('symbol', '.')
             # rule - must be an identifier
-            if self._advance_and_check_type_only('identifier'):
+            if self._advance_and_check_type_only('IDENTIFIER'):
                 self._write_tag('identifier', self.tokenizer.identifier())
-                self._write_tag('symbol', '(')
+                if self._advance_and_check('SYMBOL', '('):
+                    self._write_tag('symbol', '(')
                 # rule - must be an expression
                 self.tokenizer.advance()
-                self.compile_expression
-                # rule - must be )
-                if self._only_check('SYMBOL', ')'):
-                    self._write_tag('symbol', ')')
+                self.compile_expression_list()
+
+        # rule - must be )
+        if self._only_check('SYMBOL', ')'):
+            self._write_tag('symbol', ')')
+            self.tokenizer.advance()
 
         
     def _close_tag(self, content):

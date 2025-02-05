@@ -89,6 +89,7 @@ class JackTokenizer:
         '''
         # empty string for token
         token_append = ''
+        self.is_string_val = False
 
         # 
         while True:
@@ -107,21 +108,20 @@ class JackTokenizer:
                 if current_char is None:
                     return None
                      
-                # flag if we are in a string value
-                # returns if it is the second instance of the same quotation type
+            
+
                 if current_char in {"'", '"'}:
-                    if not self.is_string_val:
-                        self.is_string_val = True
-                        self.quote_type = current_char
-                        continue
-                    if current_char == self.quote_type:
-                         # set instance vars back
-                        self.is_string_val = False
-                        self.quote_type = None
-                        if len(token_append) > 0:
-                            self.current_token = token_append
-                            return self.current_token
-                        continue
+                    self.is_string_val = True
+                    current_char = next(self.current_line_iter, None)
+                    while self.is_string_val:
+                        if current_char in {"'", '"'}:
+                            break
+                        else:
+                            token_append += current_char
+                            current_char = next(self.current_line_iter, None)
+                    self.current_token = token_append
+                    return token_append
+        
 
                 # a symbol is always a standalone token
                 if current_char in JackTokenizer.SYMBOLS:
